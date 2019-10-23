@@ -15,7 +15,6 @@ of the package that you can make changes to and immediately see the effects.
 
 `pip install -e .`
 
-
 Make will allow you to run the examples with a simpler command, while limiting the options you can change.
 They will oftentimes also perform additional steps, like cleaning up the output directories, 
 or running other necessary stages.
@@ -24,42 +23,28 @@ In general, a `make` command will look something like:
 
 `make dcgan-example`
 
-You can pass additional arguments with `make` as follows:
-
-`make dcgan-example STORAGE_DIR=../data MODEL_DIR='../models`
-
 The subsections below will provide the required `make` commands, if there are any to run the examples.
 
 To remove this package when you are done and keep your environment clean, use:
 
 `pip uninstall funwithgans`
 
-
 ### Deep Convolutional Generative Adversarial Network (DCGAN):
 
-(DCGAN Arxiv link here)[https://arxiv.org/abs/1511.06434]
+[DCGAN Arxiv link here](https://arxiv.org/abs/1511.06434)
 
 To run this example, you will need to call `__init__.py` from the `dcgan` folder.
-This can either be done directly, or through `make`. 
+This can either be done directly with `python dcgan/src/__init__.py`, or through `make`. 
 
 ##### `make` command:
 
 `make dcgan-example`
 
-Additional Arguments include:
-- STORAGE_DIR
-- MODEL_DIR
-- REPRODUCIBLE (if included, will always set the same seed)
-- EPOCHS
-- LR
-- BETA (refers to `beta1` parameter of Adam optimizer)
+Using the make command will use a `config.json` file found in the `dcgan` directory in order to set flags 
+and other command line arguments such as the location of necessary files. Please take a look at `parse_arguments` 
+found in `dcgan/utils.py` to identify these arguments and create your config file accordingly.
+Note that the names **MUST** be identical to those in the parser. (replace `-` with `_` in your `json`)
 
-If you require more customization than provided by the make command, you'll want to use python directly 
-from your shell in order to run the example:
-
-`python dcgan/src/__init__.py`
-
-You can see a full list of possible command line arguments in the `parse_args` function contained in that file.
 
 
 
