@@ -1,6 +1,8 @@
 from __future__ import print_function
 import os
 import sys
+import json
+import time
 import random
 import logging
 import argparse
@@ -29,20 +31,32 @@ def logging_wrapper():
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    root.addHandler(handler)
-    root.info("Logging successfully configured")
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+    root.addHandler(console_handler)
+    root.info("Console logging successfully configured")
+
     return root
 
 
+def overwrite_args_with_config(args):
+    with open(args.config, 'r') as f:
+        json_config = json.loads(f.read())
 
+    for k, v in json_config.items():
+        args.__setattr__(k, v)
+
+    return args
 
 def parse_args(log):
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('--config',
+                        help='Path to config file which contains filepaths and other arguments',
+                        default=False,
+                        type=str)
     parser.add_argument("--storage-dir",
                         help="Storage directory for files, default: $CWD",
                         default=os.path.join(os.getcwd(), '..'))
@@ -52,8 +66,9 @@ def parse_args(log):
     parser.add_argument('--image-dir',
                         help='Directory in which to store images generated during training.',
                         default=os.path.join(os.getcwd(), 'dcgan', 'out'))
-    parser.add_argument('--log-dir',  # TODO
-                        help='NOT YET IMPLEMENTED. Directory in which to store log files.')
+    parser.add_argument('--log-dir',
+                        help='Directory in which to store log files.',
+                        default='logs')
     parser.add_argument("--reproducible",
                         help='Flag to determine whether to set a predetermined seed for training',
                         type=bool)
@@ -65,7 +80,7 @@ def parse_args(log):
                         help='Batch size during training',
                         default=128,
                         type=int)
-    parser.add_argument("--img-dim",
+    parser.add_argument("--image-dim",
                         help='Size of images to generate',
                         default=64,
                         type=int)
@@ -87,33 +102,43 @@ def parse_args(log):
                         type=int)
 
     parsed_args = parser.parse_args()
+    if Path(parsed_args.config).exists():
+        logger.info(f"Overwriting any command-line arguments with config file found at "
+                    f"{os.getcwd()}\\{parsed_args.config}")
+        parsed_args = overwrite_args_with_config(parsed_args)
 
-    log.info("storage dir: {}".format(parsed_args.storage_dir))
-    print(type(parsed_args.storage_dir))
-    log.info("model dir: {}".format(parsed_args.model_dir))
-    log.info(f"reproducible: {parsed_args.reproducible}")
+    # Update the logger with filepath if necessary
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler = logging.FileHandler(f"{parsed_args.log_dir}/celebagan_{time.time()}.log")
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+    log.addHandler(file_handler)
+    log.info("File logging successfully configured")
 
-    return parsed_args
+    for k, v in parsed_args.__dict__.items():
+        log.debug(f"{k}: {v}")
+
+    return parsed_args, log
 
 
 def set_flags(args):
     LOADER_WORKERS = args.loader_workers
     BATCH_SIZE = args.batch_size
-    IMG_DIM = args.img_dim
+    IMG_DIM = args.image_dim
     EPOCHS = args.epochs
     LR = args.lr
     BETA1 = args.beta
     NGPU = args.ngpu
-    logger.info(f"Script flags set are:\nloader_workers: {LOADER_WORKERS}, batch_size: {BATCH_SIZE},"
+    logger.info(f"Script flags set are: loader_workers: {LOADER_WORKERS}, batch_size: {BATCH_SIZE},"
                 f" img_dim: {IMG_DIM}, epochs: {EPOCHS}, lr: {LR}, beta1: {BETA1}, ngpu: {NGPU}")
     return LOADER_WORKERS, BATCH_SIZE, IMG_DIM, EPOCHS, LR, BETA1, NGPU
-
 
 
 if __name__ == '__main__':
     logger = logging_wrapper()
 
-    args = parse_args(logger)
+    args, logger = parse_args(logger)
+
     LOADER_WORKERS, BATCH_SIZE, IMG_DIM, EPOCHS, LR, BETA1, NGPU = set_flags(args)
 
     random_seed = 903 if bool(args.reproducible) is True else random.randint(1, 100000)
@@ -151,11 +176,11 @@ if __name__ == '__main__':
 
     plt.savefig(Path(args.image_dir) / 'sample_real_images.png')
     logger.info("Successfully saved sample real images to disk.")
-    gen = Generator(NGPU).to(device)
+    gen = Generator(n_layers=3, img_dim=64, ngpu=NGPU).to(device)
     gen.apply(weights_init)
     logger.info(gen)
 
-    disc = Discriminator(NGPU).to(device)
+    disc = Discriminator(n_layers=3, img_dim=64, ngpu=NGPU).to(device)
     disc.apply(weights_init)
     logger.info(f"{disc}")
 

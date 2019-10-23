@@ -13,114 +13,110 @@ NFM_GENERATOR = 64
 NFM_DISCRIMINATOR = 64
 
 
+def build_gen_conv_cell(layer_num, ngf_mult_prev, kernel_size=4, stride=2, padding=1,
+                        bias=False, max_mult=8, img_dim=64, n_layers=3):
+
+    ngf_mult = min(2**(n_layers - layer_num), max_mult)
+
+    return [nn.ConvTranspose2d(img_dim * ngf_mult_prev,
+                               img_dim * ngf_mult,
+                               kernel_size,
+                               stride=stride, padding=padding, bias=bias),
+            nn.BatchNorm2d(img_dim * ngf_mult),
+            nn.LeakyReLU(0.2, inplace=True)], ngf_mult
+
+
 class Generator(nn.Module):
     """
     Input is a latent vector (think, right before output of discriminator)
     Output is a 3 x 64 x 64 image
     """
-    def __init__(self, ngpu):
+    def __init__(self, n_layers, img_dim, ngpu):
         super(Generator, self).__init__()
         self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # Takes in latent vector `z`
-            # ConvTranspose2d takes in tensor of shape (N, C, H, W),
-            # outputs shape (N, C_out, H_out, W_out) where:
-            # H_out = (H_in - 1) * (stride_h - 2) * padding_h + dilation_h * (kernel_size_h - 1) + output_padding_h + 1
-            # W_out = (W_in - 1) * (stride_w - 2) * padding_w + dilation_w * (kernel_size_w - 1) + output_padding_w + 1
-            # Below, we'll reduce number of channels while increasing the H and W
-            nn.ConvTranspose2d(LATENT_SHAPE,
-                               NFM_GENERATOR * 8,
-                               4,
-                               stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(NFM_GENERATOR * 8),
-            nn.ReLU(True),
 
-            # After that cell, tensor is NFM_GENERATOR*8 x 4 x 4
-            nn.ConvTranspose2d(NFM_GENERATOR * 8,
-                               NFM_GENERATOR * 4,
-                               4,
-                               stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_GENERATOR * 4),
-            nn.ReLU(True),
+        operations = list()
+        # Takes in latent vector `z`
+        # ConvTranspose2d takes in tensor of shape (N, C, H, W),
+        # outputs shape (N, C_out, H_out, W_out) where:
+        # H_out = (H_in - 1) * (stride_h - 2) * padding_h + dilation_h * (kernel_size_h - 1) + output_padding_h + 1
+        # W_out = (W_in - 1) * (stride_w - 2) * padding_w + dilation_w * (kernel_size_w - 1) + output_padding_w + 1
+        # Below, we'll reduce number of channels while increasing the H and W
+        operations += [nn.ConvTranspose2d(LATENT_SHAPE,
+                                          img_dim * 8,
+                                          kernel_size=4,
+                                          stride=1, padding=0, bias=False),
+                       nn.BatchNorm2d(img_dim * 8),
+                       nn.ReLU(inplace=True)]
+        ngf_mult = 8
+        for layer in range(1, n_layers):
+            cell, ngf_mult = build_gen_conv_cell(layer, ngf_mult, kernel_size=4, stride=2, padding=1,
+                                                 bias=False, max_mult=8, img_dim=NFM_GENERATOR, n_layers=n_layers)
+            operations += cell
 
-            # After that cell, tensor is NFM_GENERATOR*4 x 8 x 8
-            nn.ConvTranspose2d(NFM_GENERATOR * 4,
-                               NFM_GENERATOR * 2,
-                               4,
-                               stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_GENERATOR * 2),
-            nn.ReLU(True),
+        # Add final layer
+        cell, nfg_mult = build_gen_conv_cell(n_layers, ngf_mult, kernel_size=4, stride=2, padding=1,
+                                             bias=False, max_mult=8, img_dim=NFM_GENERATOR, n_layers=n_layers)
+        operations += cell
 
-            # After that cell, tensor is NFM_GENERATOR*2 x 16 x 16
-            nn.ConvTranspose2d(NFM_GENERATOR * 2,
-                               NFM_GENERATOR,
-                               4,
-                               stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_GENERATOR),
-            nn.ReLU(True),
-            # After that cell, tensor is NFM_GENERATOR x 32 x 32
-            nn.ConvTranspose2d(NFM_GENERATOR,
-                               N_CHANNELS,
-                               4,
-                               stride=2, padding=1, bias=False),
-            nn.Tanh()
-            # Final shape is N_CHANNELS x 64 x 64
-        )
+        operations += [nn.ConvTranspose2d(img_dim,
+                                          N_CHANNELS,
+                                          4,
+                                          stride=2, padding=1, bias=False),
+                       nn.Tanh()]
+
+        self.main = nn.Sequential(*operations)
 
     def forward(self, input):
         return self.main(input)
 
 
+def build_disc_conv_cell(layer_num, ndf_mult_prev, kernel_size=4, stride=2, padding=1,
+                         bias=False, max_mult=8, img_dim=64):
+
+    ndf_mult = min(2**layer_num, max_mult)
+
+    return [nn.Conv2d(img_dim * ndf_mult_prev,
+                      img_dim * ndf_mult,
+                      kernel_size,
+                      stride=stride, padding=padding, bias=bias),
+            nn.BatchNorm2d(img_dim * ndf_mult),
+            nn.LeakyReLU(0.2, inplace=True)], ndf_mult
+
+
 class Discriminator(nn.Module):
     """
     Input is 3 x 64 x 64 image
-    Output is binary decision, real or fake
+    Output is 1 x m * img_dim, where m is some positive integer. Can think of each element of representing
+    the probability that a patch of the original image comes from the true distribution or not.
 
     Uses LeakyReLU instead of regular ReLU to help gradients flow through easier.
 
     """
-    def __init__(self, ngpu):
+    def __init__(self, n_layers, img_dim, ngpu):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # input is N_CHANNELS x 64 x 64, our base images.
-            nn.Conv2d(N_CHANNELS,
-                      NFM_DISCRIMINATOR,
-                      4,
-                      stride=2, padding=1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
+        operations = list()
 
-            # After previous cell, tensor is NFM_DISCRIMINATOR x 32 x 32
-            nn.Conv2d(NFM_DISCRIMINATOR,
-                      NFM_DISCRIMINATOR * 2,
-                      4,
-                      stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_DISCRIMINATOR * 2),
-            nn.LeakyReLU(0.2, inplace=True),
+        # Input cell here:
+        operations += [nn.Conv2d(N_CHANNELS, img_dim, 4, stride=2, padding=1, bias=False),
+                       nn.LeakyReLU(0.2, inplace=True)]
+        ndf_mult = 1
 
-            # After previous cell, tensor is NFM_DISCRIMINATOR*2 x 16 x 16
-            nn.Conv2d(NFM_DISCRIMINATOR * 2,
-                      NFM_DISCRIMINATOR * 4,
-                      4,
-                      stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_DISCRIMINATOR * 4),
-            nn.LeakyReLU(0.2, inplace=True),
+        # Main loop to add cells.
+        for layer in range(1, n_layers):
+            cell, ndf_mult = build_disc_conv_cell(layer, ndf_mult, kernel_size=4, stride=2, padding=1, bias=False)
+            operations += cell
 
-            # After previous cell, tensor is NFM_DISCRIMINATOR * 4 x 8 x 8
-            nn.Conv2d(NFM_DISCRIMINATOR * 4,
-                      NFM_DISCRIMINATOR * 8,
-                      4,
-                      stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(NFM_DISCRIMINATOR * 8),
-            nn.LeakyReLU(0.2, inplace=True),
+        # Add final layer
+        cell, ndf_mult = build_disc_conv_cell(n_layers, ndf_mult, kernel_size=4, stride=2, padding=1, bias=False)
+        operations += cell
 
-            # After previous cell, tensor is NFM_DISCRIMINATOR* 8 x 4 x 4
-            nn.Conv2d(NFM_DISCRIMINATOR * 8,
-                      1,
-                      4,
-                      stride=1, padding=0, bias=False),
-            nn.Sigmoid()  # To get our final true/false pred.
-        )
+        # This is PatchGAN out (each of the n_layers * 8 elements in the output corresponds to a patch of image)
+        operations += [nn.Conv2d(img_dim * ndf_mult, 1, 4, stride=1, padding=0, bias=False),
+                       nn.Sigmoid()]
+
+        self.main = nn.Sequential(*operations)
 
     def forward(self, input):
         return self.main(input)
