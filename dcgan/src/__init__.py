@@ -24,7 +24,8 @@ import torchvision.utils as vutils
 
 # Self imports:
 from dcgan.src.networks import Generator, Discriminator, LATENT_SHAPE
-from dcgan.src.utils import logging_wrapper, parse_args, set_flags
+from dcgan.src.utils import logging_wrapper, parse_args, set_flags, get_data_loader, plot_sample_images
+
 
 def weights_init(m):
     """ Basic weight initialization for DCGAN"""
@@ -49,34 +50,23 @@ if __name__ == '__main__':
 
     # Root directory for dataset
     BASE_PATH = Path(args.storage_dir)
-    DATA_PATH = BASE_PATH / 'data' / 'celeba' / 'img_align_celeba'
+    DATA_PATH = BASE_PATH / 'data' / 'celeba' / 'img_align_celeba' if args.data_dir is None else Path(args.data_dir)
     MODEL_PATH = BASE_PATH / 'models' / 'dcgan' if args.model_dir is None else Path(args.model_dir)
     assert MODEL_PATH.exists()
 
-    TRANSFORM_LIST = [transforms.Resize(IMG_DIM),
-                      transforms.CenterCrop(IMG_DIM),
-                      transforms.ToTensor(),
-                      transforms.Normalize((0.5, 0.5, 0.5),
-                                           (0.5, 0.5, 0.5))]
-
-    images = dset.ImageFolder(root=str(DATA_PATH),
-                              transform=transforms.Compose(TRANSFORM_LIST))
-
-    loader = torch.utils.data.DataLoader(images, batch_size=BATCH_SIZE,
-                                         shuffle=True, num_workers=LOADER_WORKERS)
+    loader = get_data_loader(DATA_PATH, IMG_DIM, BATCH_SIZE, LOADER_WORKERS)
+    logger.debug("Data loader successfully set up.")
 
     device = torch.device("cuda:0" if (torch.cuda.is_available() and NGPU > 0) else "cpu")
     logger.info(f"Device is set to {device}")
 
     real_batch = next(iter(loader))
-    plt.figure(figsize=(8, 8))
-    plt.axis("off")
-    plt.title("Training Images")
-    plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:64],
-                                             padding=2, normalize=True).cpu(),
-                            (1, 2, 0)))
 
-    plt.savefig(Path(args.image_dir) / 'sample_real_images.png')
+    fig = plot_sample_images(device, real_batch)
+    fig.savefig(Path(args.image_dir) / 'sample_real_images.png')
+    logger.debug("Sample real images successfully plotted & saved.")
+    plt.close(fig)
+
     logger.info("Successfully saved sample real images to disk.")
     gen = Generator(n_layers=3, img_dim=64, ngpu=NGPU).to(device)
     gen.apply(weights_init)
@@ -170,7 +160,9 @@ if __name__ == '__main__':
 
     # When loading, remember to call `model.eval()` to set mode.
     torch.save(gen, MODEL_PATH / 'dcgan_gen.pt')
+    logger.debug("Generator model successfully saved to disk")
     torch.save(disc, MODEL_PATH / 'dcgan_disc.pt')
+    logger.debug("Discriminator model successfully saved to disk")
 
     plt.figure(figsize=(10, 5))
     plt.title("Generator and Discriminator Loss During Training")
