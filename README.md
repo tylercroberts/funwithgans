@@ -1,7 +1,15 @@
 # `funwithgans` README
 
-### Installation Help:
+This repo is a collection of simple GAN projects. Each sub-project will be self-contained and consists of at least:
+- a `networks.py` file, containing code relevant to building the networks needed for the example,
+- a `requirements.txt` file, listing any additional package requirements in addition to those indicated in the main `requirements.txt` 
+- an `__init__.py` file, which can be called in order to start training of a new model.
+- an `out` directory which is used to store any image or data outputs from the training script.
 
+There may be some duplication between the modules in each of these sub-projects such as boiler-plate code for parsing command-line arguments, setting up logging, etc.
+
+
+### Installation Help:
 To run these models, you will need to first install all dependencies.
 These can be located in the requirements.txt files of the model folder you wish to run.
 
@@ -15,7 +23,6 @@ of the package that you can make changes to and immediately see the effects.
 
 `pip install -e .`
 
-
 Make will allow you to run the examples with a simpler command, while limiting the options you can change.
 They will oftentimes also perform additional steps, like cleaning up the output directories, 
 or running other necessary stages.
@@ -24,42 +31,52 @@ In general, a `make` command will look something like:
 
 `make dcgan-example`
 
-You can pass additional arguments with `make` as follows:
-
-`make dcgan-example STORAGE_DIR=../data MODEL_DIR='../models`
-
 The subsections below will provide the required `make` commands, if there are any to run the examples.
 
-To remove this package when you are done and keep your environment clean, use:
+To remove this package when you are done, and to keep your environment clean, use:
 
 `pip uninstall funwithgans`
 
+## Projects:
 
 ### Deep Convolutional Generative Adversarial Network (DCGAN):
 
-(DCGAN Arxiv link here)[https://arxiv.org/abs/1511.06434]
+[DCGAN Arxiv link here](https://arxiv.org/abs/1511.06434)
 
 To run this example, you will need to call `__init__.py` from the `dcgan` folder.
-This can either be done directly, or through `make`. 
+This can either be done directly with `python dcgan/src/__init__.py`, or through `make`. 
 
 ##### `make` command:
 
 `make dcgan-example`
 
-Additional Arguments include:
-- STORAGE_DIR
-- MODEL_DIR
-- REPRODUCIBLE (if included, will always set the same seed)
-- EPOCHS
-- LR
-- BETA (refers to `beta1` parameter of Adam optimizer)
+Using the make command will read a `config.json` file found in the `dcgan` directory in order to set flags 
+and other command line arguments such as the location of necessary files. Please take a look at `parse_arguments` 
+found in `dcgan/utils.py` to identify these arguments and create your config file accordingly.
 
-If you require more customization than provided by the make command, you'll want to use python directly 
-from your shell in order to run the example:
+Contents from a sample config file are below:
+```json
 
-`python dcgan/src/__init__.py`
+{
+  "storage_dir": "data",
+  "model_dir": "models",
+  "image_dir": "dcgan\\out",
+  "log_dir": "logs",
+  "reproducible": 0,
+  "loader_workers": 2,
+  "batch_size": 128,
+  "image_dim": 64,
+  "epochs": 1,
+  "lr": 0.0002,
+  "beta": 0.999,
+  "ngpu": 1
+}
 
-You can see a full list of possible command line arguments in the `parse_args` function contained in that file.
+```
+
+Note that the names **MUST** be identical to those in the parser. (replace `-` with `_` in your `json`)
+
+
 
 
 
