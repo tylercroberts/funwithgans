@@ -42,21 +42,20 @@ def logging_wrapper():
     return root
 
 
-def _overwrite_args_with_config(args):
+def _read_config_and_set_args(args):
     with open(args.config, 'r') as f:
         json_config = json.loads(f.read())
 
-    for k, v in json_config.items():
-        args.__setattr__(k, v)
+    arg_list = [f"--{k}={v}" for k, v in json_config.items()]
+    args = parse_args(arg_list)
 
     return args
 
 
-def parse_args(log):
+def parse_args(args, logger=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--config',
                         help='Path to config file which contains filepaths and other arguments',
-                        default=False,
                         type=str)
     parser.add_argument("--storage-dir",
                         help="Storage directory for files, default: $CWD",
@@ -104,24 +103,20 @@ def parse_args(log):
                         default=1,
                         type=int)
 
-    parsed_args = parser.parse_args()
-    if Path(parsed_args.config).exists():
-        log.info(f"Overwriting any command-line arguments with config file found at "
-                 f"{os.getcwd()}\\{parsed_args.config}")
-        parsed_args = _overwrite_args_with_config(parsed_args)
+    parsed_args = parser.parse_args(args)
+    try:
+        if Path(parsed_args.config).exists():
+            if logger is not None:
+                logger.info(f"Using config file at: {parsed_args.config}")
+            parsed_args = _read_config_and_set_args(parsed_args)
 
-    # Update the logger with filepath if necessary
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(f"{parsed_args.log_dir}/celebagan_{time.time()}.log")
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
-    log.addHandler(file_handler)
-    log.info("File logging successfully configured")
+        else:
+            raise ValueError("Config file specified was not found.")
+    except TypeError:
+        if logger is not None:
+            logger.info("No config file specified. Using passed arguments instead")
 
-    for k, v in parsed_args.__dict__.items():
-        log.debug(f"{k}: {v}")
-
-    return parsed_args, log
+    return parsed_args
 
 
 def get_data_loader(data_path, img_dim, batch_size, loader_workers):

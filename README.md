@@ -1,4 +1,4 @@
-# `funwithgans` README
+# `funwithgans` README  ![](https://travis-ci.com/tylercroberts/funwithgans.svg?branch=master)
 
 This repo is a collection of simple GAN projects. Each sub-project will be self-contained and consists of at least:
 - a `networks.py` file, containing code relevant to building the networks needed for the example,
