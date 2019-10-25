@@ -56,25 +56,23 @@ found in `dcgan/utils.py` to identify these arguments and create your config fil
 
 Contents from a sample config file are below:
 ```json
-
-{
-  "storage_dir": "data",
-  "model_dir": "models",
-  "image_dir": "dcgan\\out",
-  "log_dir": "logs",
-  "reproducible": 0,
-  "loader_workers": 2,
-  "batch_size": 128,
-  "image_dim": 64,
-  "epochs": 1,
-  "lr": 0.0002,
-  "beta": 0.999,
-  "ngpu": 1
-}
-
+   {
+    "storage-dir": "data",
+    "model-dir": "models",
+    "image-dir": "dcgan\\out",
+    "log-dir": "logs",
+    "reproducible": 0,
+    "loader-workers": 2,
+    "batch-size": 128,
+    "image-dim": 64,
+    "epochs": 1,
+    "lr": 0.0002,
+    "beta": 0.999,
+    "ngpu": 1
+   }
 ```
 
-Note that the names **MUST** be identical to those in the parser. (replace `-` with `_` in your `json`)
+Note that the names **MUST** be identical to those in the parser.
 
 
 
