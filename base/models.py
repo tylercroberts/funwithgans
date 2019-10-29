@@ -1,5 +1,6 @@
 import torch
 import random
+import numpy as np
 from pathlib import Path
 
 from abc import ABC, abstractmethod
@@ -8,7 +9,7 @@ from abc import ABC, abstractmethod
 class BaseModel(ABC):
     """Abstract Base Class for all models inside project folders."""
 
-    def __init__(self, args, train=True, logger=None):
+    def __init__(self, args, seed=None, train=True, logger=None):
         self.device = torch.device("cuda:0" if (torch.cuda.is_available() and args.ngpu > 0) else "cpu")
         self.train = train
         self.storage_dir = args.storage_dir
@@ -17,8 +18,7 @@ class BaseModel(ABC):
         self.data_dir = args.data_dir
         self.log_dir = args.log_dir
         self.logger = logger
-        self.random_seed = 903 if bool(args.reproducible) is True else random.randint(1, 100000)
-        self.img_dim = args.img_dim
+        self.image_dim = args.image_dim
         self.batch_size = args.batch_size
         self.lr = args.lr
         self.epochs = args.epochs
@@ -26,9 +26,7 @@ class BaseModel(ABC):
         self.ngpu = args.ngpu
         self.models = list()
         self.model_name = ''
-
-        logger.info(f"Random seed is {self.random_seed}")
-        random.seed(self.random_seed)
+        self.set_random_seed(seed)
 
     @abstractmethod
     def forward(self):
@@ -66,5 +64,13 @@ class BaseModel(ABC):
             if net is not None:
                 for param in net.parameters():
                     param.requires_grad = requires_grad
+
+    def set_random_seed(self, seed):
+        if seed is None:
+            seed = np.random.randint(1, 1000000000)
+
+        self.random_seed = seed
+        self.logger.info(f"Random seed is {self.random_seed}")
+        random.seed(seed)
 
 
