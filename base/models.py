@@ -53,6 +53,5 @@ class BaseModel(ABC):
 
     @abstractmethod
     def predict_test(self):
-        with torch.no_grad():
-            self.forward()
+        pass
 
