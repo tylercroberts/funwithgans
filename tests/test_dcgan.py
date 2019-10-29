@@ -61,13 +61,13 @@ class TestDCGAN(object):
         from dcgan.src import weights_init
 
         try:
-            gen = Generator(n_layers=3, img_dim=64, ngpu=1).to(device)
+            gen = Generator(n_layers=3, image_dim=64, ngpu=1).to(device)
             gen.apply(weights_init)
         except:
             raise ValueError("Cannot apply weights_init to generator")
 
         try:
-            disc = Discriminator(n_layers=3, img_dim=64, ngpu=1).to(device)
+            disc = Discriminator(n_layers=3, image_dim=64, ngpu=1).to(device)
             disc.apply(weights_init)
         except:
             raise ValueError("Cannot apply weights_init to discriminator")
