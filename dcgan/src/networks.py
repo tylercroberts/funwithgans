@@ -71,19 +71,6 @@ class Generator(nn.Module):
         return self.main(input)
 
 
-def build_disc_conv_cell(layer_num, ndf_mult_prev, kernel_size=4, stride=2, padding=1,
-                         bias=False, max_mult=8, img_dim=64):
-
-    ndf_mult = min(2**layer_num, max_mult)
-
-    return [nn.Conv2d(img_dim * ndf_mult_prev,
-                      img_dim * ndf_mult,
-                      kernel_size,
-                      stride=stride, padding=padding, bias=bias),
-            nn.BatchNorm2d(img_dim * ndf_mult),
-            nn.LeakyReLU(0.2, inplace=True)], ndf_mult
-
-
 class Discriminator(nn.Module):
     """
     Input is 3 x 64 x 64 image
@@ -93,27 +80,31 @@ class Discriminator(nn.Module):
     Uses LeakyReLU instead of regular ReLU to help gradients flow through easier.
 
     """
-    def __init__(self, n_layers, img_dim, ngpu):
+    def __init__(self, n_layers, img_dim, ngpu, stride=2, padding=1, bias=False, max_mult=8):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
         operations = list()
 
         # Input cell here:
-        operations += [nn.Conv2d(N_CHANNELS, img_dim, 4, stride=2, padding=1, bias=False),
+        operations += [nn.Conv2d(N_CHANNELS, img_dim, 4, stride=stride, padding=padding, bias=bias),
                        nn.LeakyReLU(0.2, inplace=True)]
         ndf_mult = 1
 
         # Main loop to add cells.
         for layer in range(1, n_layers):
-            cell, ndf_mult = build_disc_conv_cell(layer, ndf_mult, kernel_size=4, stride=2, padding=1, bias=False)
-            operations += cell
+            cell = ConvDiscriminatorCell(layer, img_dim=img_dim, kernel_size=4, stride=stride,
+                                         padding=padding, bias=bias)
+            operations += [cell]
 
         # Add final layer
-        cell, ndf_mult = build_disc_conv_cell(n_layers, ndf_mult, kernel_size=4, stride=2, padding=1, bias=False)
-        operations += cell
+        cell = ConvDiscriminatorCell(n_layers, img_dim=img_dim, kernel_size=4, stride=stride,
+                                     padding=padding, bias=bias)
+        operations += [cell]
+
+        ndf_mult = min(2**n_layers, max_mult)
 
         # This is PatchGAN out (each of the n_layers * 8 elements in the output corresponds to a patch of image)
-        operations += [nn.Conv2d(img_dim * ndf_mult, 1, 4, stride=1, padding=0, bias=False),
+        operations += [nn.Conv2d(img_dim * ndf_mult, 1, 4, stride=1, padding=0, bias=bias),
                        nn.Sigmoid()]
 
         self.main = nn.Sequential(*operations)
@@ -122,3 +113,27 @@ class Discriminator(nn.Module):
         return self.main(input)
 
 
+class ConvDiscriminatorCell(nn.Module):
+
+    def __init__(self, layer_num, img_dim=64, kernel_size=4, stride=2, padding=1,
+                         bias=False):
+        super(ConvDiscriminatorCell, self).__init__()
+        self.cell = self.build_conv_cell(layer_num, img_dim=img_dim, kernel_size=kernel_size, stride=stride,
+                                         padding=padding, bias=bias)
+
+    def build_conv_cell(self, layer_num, image_dim=64,  kernel_size=4, stride=2, padding=1,
+                         bias=False, max_mult=8, img_dim=64):
+        ndf_mult_prev = min(2**(layer_num-1), max_mult)
+        ndf_mult = min(2**layer_num, max_mult)
+
+        self.input_shape = ()
+
+        return nn.Sequential(nn.Conv2d(img_dim * ndf_mult_prev,
+                                       img_dim * ndf_mult,
+                                       kernel_size,
+                                       stride=stride, padding=padding, bias=bias),
+                             nn.BatchNorm2d(img_dim * ndf_mult),
+                             nn.LeakyReLU(0.2, inplace=True))
+
+    def forward(self, input):
+        return self.cell(input)
