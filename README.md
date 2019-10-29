@@ -11,7 +11,7 @@ There may be some duplication between the modules in each of these sub-projects 
 
 ### Installation Help:
 To run these models, you will need to first install all dependencies.
-These can be located in the requirements.txt files of the model folder you wish to run.
+These can be located in the `requirements.txt` files of the model folder you wish to run.
 
 Move into the model folder and run the following command:
 

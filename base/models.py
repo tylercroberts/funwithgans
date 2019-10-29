@@ -55,3 +55,16 @@ class BaseModel(ABC):
     def predict_test(self):
         pass
 
+    def set_requires_grad(self, nets, requires_grad=False):
+        """
+        Toggles gradient calculations to avoid unnecessary calculation.
+
+        """
+        if not isinstance(nets, list):
+            nets = [nets]
+        for net in nets:
+            if net is not None:
+                for param in net.parameters():
+                    param.requires_grad = requires_grad
+
+
