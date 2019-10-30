@@ -92,7 +92,7 @@ if __name__ == '__main__':
                 D_losses.append(err_disc.item())
 
             # Save training images from generator every 500 iters:
-            if (iters % 50 == 0) or ((epoch == EPOCHS-1) and i == len(loader) - 1):
+            if (iters % 500 == 0) or ((epoch == EPOCHS-1) and i == len(loader) - 1):
                 with torch.no_grad():
                     fake = model.G(noisy_vectors).detach().cpu()
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
                 img = vutils.make_grid(fake, padding=2, normalize=True)
                 img_list.append(img)
                 plt.imshow(np.transpose(img[:64], (1, 2, 0)))
-                fig.savefig(Path(args.image_dir)/ 'fakes' / f"fake_{epoch}_{iters}.png")
+                fig.savefig(Path(args.image_dir) / f"fake_{epoch}_{iters}.png")
                 plt.close()
             iters += 1
 
@@ -113,7 +113,9 @@ if __name__ == '__main__':
     plt.xlabel("iterations")
     plt.ylabel("Loss")
     plt.legend()
+    plt.savefig(Path(args.imgae_dir) / 'training_loss.png')
     plt.show()
+
 
     fig = plt.figure(figsize=(8, 8))
     plt.axis("off")
