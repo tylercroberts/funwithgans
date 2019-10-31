@@ -30,7 +30,7 @@ from dcgan.src.utils import logging_wrapper, parse_args, set_flags, get_data_loa
 def weights_init(m):
     """ Basic weight initialization for DCGAN"""
     classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
+    if classname.find('Conv2') != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
     elif classname.find("BatchNorm") != -1:
         nn.init.normal_(m.weight.data, 1, 0.02)
@@ -39,8 +39,20 @@ def weights_init(m):
 
 if __name__ == '__main__':
     logger = logging_wrapper()
+    args = parse_args(sys.argv[1:])
 
-    args, logger = parse_args(logger)
+    # Update the logger with filepath if necessary
+    if logger is not None:
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler = logging.FileHandler(f"{args.log_dir}/celebagan_{time.time()}.log")
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)
+        logger.addHandler(file_handler)
+        logger.info("File logging successfully configured")
+
+    if logger is not None:
+        for k, v in args.__dict__.items():
+            logger.debug(f"{k}: {v}")
 
     LOADER_WORKERS, BATCH_SIZE, IMG_DIM, EPOCHS, LR, BETA1, NGPU = set_flags(args, logger)
 
@@ -113,7 +125,7 @@ if __name__ == '__main__':
             label = torch.full((b_size,),  # BATCH_SIZE array of 1s
                                pos_label, device=device)
             # Forward pass:
-            out = disc(real_cpu).view(-1)  # Why view(-1)
+            out = disc(real_cpu).view(-1)  # view(-1) is like np.ndarray.reshape(-1)
             err_disc_real = criterion(out, label)
             err_disc_real.backward()
             Dx = out.mean().item()

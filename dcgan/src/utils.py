@@ -42,21 +42,20 @@ def logging_wrapper():
     return root
 
 
-def _overwrite_args_with_config(args):
+def _read_config_and_set_args(args):
     with open(args.config, 'r') as f:
         json_config = json.loads(f.read())
 
-    for k, v in json_config.items():
-        args.__setattr__(k, v)
+    arg_list = [f"--{k}={v}" for k, v in json_config.items()]
+    args = parse_args(arg_list)
 
     return args
 
 
-def parse_args(log):
+def parse_args(args, logger=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--config',
                         help='Path to config file which contains filepaths and other arguments',
-                        default=False,
                         type=str)
     parser.add_argument("--storage-dir",
                         help="Storage directory for files, default: $CWD",
@@ -104,27 +103,35 @@ def parse_args(log):
                         default=1,
                         type=int)
 
-    parsed_args = parser.parse_args()
-    if Path(parsed_args.config).exists():
-        log.info(f"Overwriting any command-line arguments with config file found at "
-                 f"{os.getcwd()}\\{parsed_args.config}")
-        parsed_args = _overwrite_args_with_config(parsed_args)
+    parsed_args = parser.parse_args(args)
+    try:
+        if Path(parsed_args.config).exists():
+            if logger is not None:
+                logger.info(f"Using config file at: {parsed_args.config}")
+            parsed_args = _read_config_and_set_args(parsed_args)
 
-    # Update the logger with filepath if necessary
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(f"{parsed_args.log_dir}/celebagan_{time.time()}.log")
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
-    log.addHandler(file_handler)
-    log.info("File logging successfully configured")
+        else:
+            raise ValueError("Config file specified was not found.")
+    except TypeError:
+        if logger is not None:
+            logger.info("No config file specified. Using passed arguments instead")
 
-    for k, v in parsed_args.__dict__.items():
-        log.debug(f"{k}: {v}")
-
-    return parsed_args, log
+    return parsed_args
 
 
 def get_data_loader(data_path, img_dim, batch_size, loader_workers):
+    """
+    Returns an iterable that will stream data from a folder on disk.
+
+    Args:
+        data_path (Path): Path to main data storage folder. should contain subfolders which themselves contain images.
+        img_dim (int): Dimension of the images to expect from `loader` object
+        batch_size (int): Batch size for each call of `next()`
+        loader_workers (int): Number of worker threads to use for loading data. If issues occur, try setting this to 0.
+
+    Returns:
+
+    """
     transform_list = _get_transform_list(img_dim)
     images = dset.ImageFolder(root=str(data_path),
                               transform=transforms.Compose(transform_list))
@@ -136,6 +143,7 @@ def get_data_loader(data_path, img_dim, batch_size, loader_workers):
 
 
 def _get_transform_list(img_dim):
+    """Transformations done upon loading images for training."""
     transform_list = [transforms.Resize(img_dim),
                       transforms.CenterCrop(img_dim),
                       transforms.ToTensor(),
@@ -146,6 +154,18 @@ def _get_transform_list(img_dim):
 
 
 def plot_sample_images(device, batch, fig_size=(8, 8)):
+    """
+    Plot sample images from the dataset for sanity check.
+    Does not save images, in order that users remember to close out the plot when finished with it.
+
+    Args:
+        device (Device or str): Device to move images to.
+        batch (tuple): Element of `loader` from torch library
+        fig_size (tuple): Size of image to plot.
+
+    Returns:
+
+    """
     fig = plt.figure(figsize=fig_size)
     plt.axis('off')
     fig.suptitle("Training Images")

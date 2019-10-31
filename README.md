@@ -1,4 +1,4 @@
-# `funwithgans` README
+# `funwithgans` README  ![](https://travis-ci.com/tylercroberts/funwithgans.svg?branch=master)
 
 This repo is a collection of simple GAN projects. Each sub-project will be self-contained and consists of at least:
 - a `networks.py` file, containing code relevant to building the networks needed for the example,
@@ -11,7 +11,7 @@ There may be some duplication between the modules in each of these sub-projects 
 
 ### Installation Help:
 To run these models, you will need to first install all dependencies.
-These can be located in the requirements.txt files of the model folder you wish to run.
+These can be located in the `requirements.txt` files of the model folder you wish to run.
 
 Move into the model folder and run the following command:
 
@@ -56,25 +56,23 @@ found in `dcgan/utils.py` to identify these arguments and create your config fil
 
 Contents from a sample config file are below:
 ```json
-
-{
-  "storage_dir": "data",
-  "model_dir": "models",
-  "image_dir": "dcgan\\out",
-  "log_dir": "logs",
-  "reproducible": 0,
-  "loader_workers": 2,
-  "batch_size": 128,
-  "image_dim": 64,
-  "epochs": 1,
-  "lr": 0.0002,
-  "beta": 0.999,
-  "ngpu": 1
-}
-
+   {
+    "storage-dir": "data",
+    "model-dir": "models",
+    "image-dir": "dcgan\\out",
+    "log-dir": "logs",
+    "reproducible": 0,
+    "loader-workers": 2,
+    "batch-size": 128,
+    "image-dim": 64,
+    "epochs": 1,
+    "lr": 0.0002,
+    "beta": 0.999,
+    "ngpu": 1
+   }
 ```
 
-Note that the names **MUST** be identical to those in the parser. (replace `-` with `_` in your `json`)
+Note that the names **MUST** be identical to those in the parser.
 
 
 
