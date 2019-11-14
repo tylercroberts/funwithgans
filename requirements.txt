@@ -6,3 +6,4 @@ click==7.0
 pytest==5.2.1
 pytest-cov==2.8.1
 sphinx==2.2.0
+kedro

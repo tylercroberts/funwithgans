@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import random
 import logging
 import argparse
 import numpy as np
@@ -12,20 +13,6 @@ import torch
 import torchvision.utils as vutils
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
-
-from torch.utils.data.dataloader import DataLoader
-
-def set_flags(args, logger):
-    LOADER_WORKERS = args.loader_workers
-    BATCH_SIZE = args.batch_size
-    IMG_DIM = args.image_dim
-    EPOCHS = args.epochs
-    LR = args.lr
-    BETA1 = args.beta
-    NGPU = args.ngpu
-    logger.info(f"Script flags set are: loader_workers: {LOADER_WORKERS}, batch_size: {BATCH_SIZE},"
-                f" img_dim: {IMG_DIM}, epochs: {EPOCHS}, lr: {LR}, beta1: {BETA1}, ngpu: {NGPU}")
-    return LOADER_WORKERS, BATCH_SIZE, IMG_DIM, EPOCHS, LR, BETA1, NGPU
 
 
 def logging_wrapper():
@@ -41,6 +28,20 @@ def logging_wrapper():
     root.info("Console logging successfully configured")
 
     return root
+
+
+def set_flags(args, logger):
+    LOADER_WORKERS = args.loader_workers
+    BATCH_SIZE = args.batch_size
+    IMG_DIM = args.image_dim
+    EPOCHS = args.epochs
+    LR = args.lr
+    BETA1 = args.beta
+    NGPU = args.ngpu
+    logger.info(f"Script flags set are: loader_workers: {LOADER_WORKERS}, batch_size: {BATCH_SIZE},"
+                f" img_dim: {IMG_DIM}, epochs: {EPOCHS}, lr: {LR}, beta1: {BETA1}, ngpu: {NGPU}")
+    return LOADER_WORKERS, BATCH_SIZE, IMG_DIM, EPOCHS, LR, BETA1, NGPU
+
 
 
 def _read_config_and_set_args(args):
@@ -117,35 +118,25 @@ def parse_args(args, logger=None):
         if logger is not None:
             logger.info("No config file specified. Using passed arguments instead")
 
-    return parsed_args
 
-
-def get_data_loader(data_path: str, img_dim: int, batch_size: int, loader_workers: int) -> DataLoader:
-    """
-    Returns an iterable that will stream data from a folder on disk.
-
-    Args:
-        data_path (Path): Path to main data storage folder. should contain subfolders which themselves contain images.
-        img_dim (int): Dimension of the images to expect from `loader` object
-        batch_size (int): Batch size for each call of `next()`
-        loader_workers (int): Number of worker threads to use for loading data. If issues occur, try setting this to 0.
-
-    Returns:
-
-    """
-    data_path = Path(data_path)
+def get_data_loader(data_path, img_dim, batch_size, loader_workers):
     transform_list = _get_transform_list(img_dim)
-    images = dset.ImageFolder(root=str(data_path),
-                              transform=transforms.Compose(transform_list))
+    real_images = dset.ImageFolder(root=str(data_path),
+                                   transform=transforms.Compose(transform_list))
 
-    loader = torch.utils.data.DataLoader(images, batch_size=batch_size,
-                                         shuffle=True, num_workers=loader_workers)
+    real_loader = torch.utils.data.DataLoader(real_images, batch_size=batch_size,
+                                              shuffle=True, num_workers=loader_workers)
 
-    return loader
+    fake_images = dset.ImageFolder(root=str(data_path),
+                                   transform=transforms.Compose(transform_list))
+
+    fake_loader = torch.utils.data.DataLoader(fake_images, batch_size=batch_size,
+                                              shuffle=True, num_workers=loader_workers)
+
+    return real_loader, fake_loader
 
 
 def _get_transform_list(img_dim):
-    """Transformations done upon loading images for training."""
     transform_list = [transforms.Resize(img_dim),
                       transforms.CenterCrop(img_dim),
                       transforms.ToTensor(),
@@ -155,24 +146,42 @@ def _get_transform_list(img_dim):
     return transform_list
 
 
-def plot_sample_images(device, batch, fig_size=(8, 8)):
+class ImagePool(object):
     """
-    Plot sample images from the dataset for sanity check.
-    Does not save images, in order that users remember to close out the plot when finished with it.
-
-    Args:
-        device (Device or str): Device to move images to.
-        batch (tuple): Element of `loader` from torch library
-        fig_size (tuple): Size of image to plot.
-
-    Returns:
-
+    Used to train our generator on a bunch of previously generated fakes,
+    since batch_size is going to be 1 mainly.
     """
-    fig = plt.figure(figsize=fig_size)
-    plt.axis('off')
-    fig.suptitle("Training Images")
-    plt.imshow(np.transpose(vutils.make_grid(batch[0].to(device)[:fig_size[0]*fig_size[1]],
-                                             padding=2, normalize=True).cpu(),
-                            (1, 2, 0)))
 
-    return fig
+    def __init__(self, size):
+        self.size = size
+        if self.size > 0:
+            self.n_images = 0
+            self.images = list()
+
+    def get_images(self, images):
+        if self.size == 0:
+            return images
+
+        out = list()
+        for image in images:
+            image = torch.unsqueeze(image.data, 0)
+            out = self.update_pool(image, out)
+
+        out = torch.cat(out, 0)
+        return out
+
+    def update_pool(self, image, out):
+        if self.n_images < self.size:
+            self.n_images += 1
+            self.images.append(image)
+        else:
+            p = random.uniform(0, 1)
+            if p > 0.5:
+                random_id = random.randint(0, self.size - 1)
+                tmp = self.images[random_id].clone()
+                self.images[random_id] = image
+                out.append(tmp)
+            else:
+                out.append(image)
+
+        return out

@@ -1,0 +1,27 @@
+
+# Parameters for the DCGAN model.
+# In addition to these, you should also place `parameters.yml` in the `conf/local` directory with the following args:
+#
+# storage-dir: <str>
+# model-dir: <str>
+# data-dir: <str>
+# image-dir: <str>
+# log-dir: <str>
+#
+channels: 3
+n_filters: 64
+n_layers: 3
+reproducible: 0
+loader_workers: 2
+batch_size: 128
+image_dim: 64
+latent_shape: 100
+epochs: 5
+lr: 0.0002
+beta: 0.5
+ngpu: 1
+storage_dir: ..
+model_dir: ../models
+data_dir: ../data/celeba/img_align_celeba/
+image_dir: dcgan/out
+log_dir: logs

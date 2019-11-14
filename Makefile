@@ -1,4 +1,4 @@
-dcgan-example: dcgan/src/__init__.py  dcgan/src/networks.py dcgan/src/utils.py
+dcgan-example: dcgan/train.py, dcgan/__init__.py  dcgan/src/networks.py dcgan/src/utils.py
 	make clean
 	python dcgan/train.py --config='dcgan\\config.json'
 

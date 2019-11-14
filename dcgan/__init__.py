@@ -1,5 +1,10 @@
 # Basic Imports
 import itertools
+from os.path import isfile
+import logging
+from typing import Any, Union, Dict
+from kedro.io import AbstractDataSet
+from torch.utils.data.dataloader import DataLoader
 
 # Torch Imports
 import torch
@@ -8,6 +13,39 @@ from torch import nn
 # Self Imports
 from base.models import BaseModel
 from dcgan.src.networks import Generator, Discriminator, LATENT_SHAPE
+from .src import get_data_loader
+
+
+class TorchImageFolderDataSet(AbstractDataSet):
+
+    def __init__(self,
+                 filepath: str,
+                 load_args: Dict[str, Any] = None,
+                 save_args: Dict[str, Any] = None) -> None:
+        self._filepath = filepath
+
+        default_save_args = {}
+        default_load_args = {"img_dim": 64,
+                             "batch_size": 128,
+                             "loader_workers": 2}
+
+        self._load_args = {**default_load_args, **load_args} \
+            if load_args is not None else default_load_args
+        self._save_args = {**default_save_args, **save_args} \
+            if save_args is not None else default_save_args
+
+    def _load(self) -> DataLoader:
+        loader = get_data_loader(self._filepath, **self._load_args)
+        return loader
+
+    def _save(self):
+        pass
+
+
+    def _describe(self) -> Dict[str, Any]:
+        return dict(filepath=self._filepath,
+                    load_args=self._load_args,
+                    save_args=self._save_args)
 
 
 def weights_init(m):
@@ -23,7 +61,9 @@ def weights_init(m):
 
 
 class DCGANModel(BaseModel):
-    def __init__(self, args, channels=3, n_filters=64, n_layers=3, train=True, logger=None, seed=903, model_name=''):
+    def __init__(self, args, channels: int = 3,
+                 n_filters: int = 64, n_layers: int = 3,
+                 train=True, seed: int = 903, model_name=''):
         """
         BaseModel Subclass for DCGAN example. Main interface for training, saving, and generating images.
 
@@ -33,11 +73,10 @@ class DCGANModel(BaseModel):
             n_filters (int): Number of filters in the final convolutional layer.
             n_layers (int): Number of ConvDiscriminatorCells to add in the Discriminator
             train (bool): Flag to indicate training mode. Will not load or create Discriminators if False.
-            logger (Logger): Configured logger object to allow debugging.
             seed (int): Random seed to allow reproducibility
             model_name (str): Will be used in saving model files & other outputs.
         """
-        super(DCGANModel, self).__init__(args, seed=seed, train=train, logger=logger)
+        super(DCGANModel, self).__init__(args, seed=seed, train=train)
 
         self.channels = channels
         self.n_layers = n_layers
@@ -47,15 +86,15 @@ class DCGANModel(BaseModel):
         self.real = None
         self.fake = None
 
-        logger.info(f"DCGANModel Training Mode: {self.train}")
+        self.logger = logging.getLogger(__name__)
 
+        self.logger.info(f"DCGANModel Training Mode: {self.train}")
         gen = Generator(n_layers=self.n_layers, image_dim=self.image_dim, ngpu=self.ngpu).to(self.device)
         gen.apply(weights_init)
         self.models.append("G")
         self.G = gen
 
-        if self.logger is not None:
-            self.logger.info(f"{gen}")
+        self.logger.info(f"{gen}")
 
         if train:
             disc = Discriminator(n_layers=self.n_layers, image_dim=self.image_dim, ngpu=self.ngpu).to(self.device)
@@ -63,8 +102,7 @@ class DCGANModel(BaseModel):
             self.models.append("D")
             self.D = disc
 
-            if self.logger is not None:
-                self.logger.info(f"{disc}")
+            self.logger.info(f"{disc}")
 
             self.optimizer_G = torch.optim.Adam(self.G.parameters(),
                                                 lr=self.lr, betas=(self.beta1, 0.999))

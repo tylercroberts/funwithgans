@@ -1,3 +1,4 @@
+import logging
 import torch
 import random
 import numpy as np
@@ -9,21 +10,21 @@ from abc import ABC, abstractmethod
 class BaseModel(ABC):
     """Abstract Base Class for all models inside project folders."""
 
-    def __init__(self, args, seed=None, train=True, logger=None):
-        self.device = torch.device("cuda:0" if (torch.cuda.is_available() and args.ngpu > 0) else "cpu")
+    def __init__(self, args, seed=None, train=True):
+        self.device = torch.device("cuda:0" if (torch.cuda.is_available() and args['ngpu'] > 0) else "cpu")
         self.train = train
-        self.storage_dir = args.storage_dir
-        self.model_dir = args.model_dir
-        self.image_dir = args.image_dir
-        self.data_dir = args.data_dir
-        self.log_dir = args.log_dir
-        self.logger = logger
-        self.image_dim = args.image_dim
-        self.batch_size = args.batch_size
-        self.lr = args.lr
-        self.epochs = args.epochs
-        self.beta1 = args.beta
-        self.ngpu = args.ngpu
+        self.storage_dir = args['storage_dir']
+        self.model_dir = args['model_dir']
+        self.image_dir = args['image_dir']
+        self.data_dir = args['data_dir']
+        self.log_dir = args['log_dir']
+        self.logger = logging.getLogger(__name__)
+        self.image_dim = args['image_dim']
+        self.batch_size = args['batch_size']
+        self.lr = args['lr']
+        self.epochs = args['epochs']
+        self.beta1 = args['beta']
+        self.ngpu = args['ngpu']
         self.models = list()
         self.model_name = ''
         self.set_random_seed(seed)
