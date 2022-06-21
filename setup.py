@@ -10,7 +10,7 @@ setup(
     install_requires=[
         'torch==1.0.1',
         'torchvision==0.4.1',
-        'numpy==1.17.3',
+        'numpy==1.22.0',
         'matplotlib==3.1.1',
     ]
 
